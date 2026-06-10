@@ -20,12 +20,32 @@ REACT_REPO   := .repos/react
 REACT_URL    := https://github.com/facebook/react
 SOAK_MINUTES ?= 240
 
-.PHONY: all test eval benchmark benchmark-react benchmarks perf scale scale-big integration soak build clean
+.PHONY: all test eval benchmark benchmark-react benchmarks perf scale scale-big integration soak build verify-workers clean
 
 all: test eval benchmark perf scale integration
 
-build:
+# Worker entry points are spawned at runtime via new Worker(new URL('./x.js',
+# import.meta.url)) and never statically imported (broker.ts:83-84,
+# pipeline.ts:10). `npm run build` runs `tsc` in PROJECT mode, which emits
+# every file in tsconfig `include` regardless of the import graph — so they
+# build. verify-workers guards against a future switch to an entry-point /
+# bundle build that would silently drop them. See src/Makefile for detail.
+WORKER_ENTRIES := \
+  dist/src/workers/writer-worker.js \
+  dist/src/workers/reader-worker.js \
+  dist/src/sync/sync-worker.js
+
+build: verify-workers
+
+verify-workers:
 	npm run build
+	@missing=0; for f in $(WORKER_ENTRIES); do \
+	  [ -f "$$f" ] || { echo "MISS $$f"; missing=1; }; \
+	done; \
+	if [ $$missing -ne 0 ]; then \
+	  echo "build: a worker entry is missing — build emitted JS by import graph, not \`tsc -p\`"; \
+	  exit 1; \
+	fi
 
 $(REPORTS):
 	mkdir -p $(REPORTS)

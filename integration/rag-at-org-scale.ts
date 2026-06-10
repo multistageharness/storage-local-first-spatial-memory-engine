@@ -19,8 +19,8 @@
  */
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { FederatedEngine } from '../src/federated-engine.js';
-import { assembleContext } from '../src/federation/context.js';
+import { FederatedEngine } from '../dist/src/federated-engine.js';
+import { assembleContext } from '../dist/src/federation/context.js';
 import {
   buildSyntheticOrg,
   synthesizeOrgQueries,

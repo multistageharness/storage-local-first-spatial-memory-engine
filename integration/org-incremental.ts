@@ -12,9 +12,9 @@
  */
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { FederatedEngine } from '../src/federated-engine.js';
+import { FederatedEngine } from '../dist/src/federated-engine.js';
 import { buildSyntheticOrg, mulberry32 } from '../__test__/benchmark/org-dataset.js';
-import type { SourceDocumentInput } from '../src/engine.js';
+import type { SourceDocumentInput } from '../dist/src/engine.js';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);

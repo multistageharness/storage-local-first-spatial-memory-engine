@@ -14,8 +14,8 @@
  */
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { FederatedEngine } from '../src/federated-engine.js';
-import { chunkText } from '../src/spatial/chunker.js';
+import { FederatedEngine } from '../dist/src/federated-engine.js';
+import { chunkText } from '../dist/src/spatial/chunker.js';
 import { buildSyntheticOrg } from '../__test__/benchmark/org-dataset.js';
 
 function arg(name: string, fallback: string): string {

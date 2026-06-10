@@ -8,21 +8,45 @@
  * federated fan-out at 1/50-way), outbox drain rate, ShardPool cold-open
  * latency + LRU churn.
  *
+ * Per-runner baselines (.plans/perf-gates/01): the bands assume the gated
+ * run shares hardware with the baseline. The gate derives a runner class
+ * from the env fingerprint (`<platform>-<arch>-<cores>c`, e.g.
+ * `linux-x64-4c`) and prefers a class-specific baseline
+ * `perf-baseline.<class>.json` next to --baseline when present, falling
+ * back to the default. `--update-baseline` writes the class-specific file
+ * (never clobbers the committed default). Pin a runner with
+ * `make perf-rebaseline` ON that runner; override the class with
+ * `--runner-class <name>` or `PERF_RUNNER_CLASS`.
+ *
  * Usage: node dist/integration/perf-gate.js
  *          [--baseline __test__/benchmark/perf-baseline.json]
  *          [--report reports/perf-report.json]
- *          [--update-baseline]   (writes the run as the new baseline)
+ *          [--update-baseline]      (writes the run as the class baseline)
+ *          [--runner-class <name>]  (override the derived hardware class)
+ *          [--print-runner-class]   (print the derived class and exit)
+ *          [--tolerance 0.25]       (relative band, fraction)
+ *          [--latency-floor 0.5]    (absolute ms floor for latency fields;
+ *                                    also PERF_LATENCY_FLOOR — a latency
+ *                                    metric fails only if it breaches BOTH
+ *                                    the band AND this absolute movement,
+ *                                    so sub-ms timer jitter can't trip it)
  */
 import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
-import { availableParallelism } from 'node:os';
 import { dirname, join } from 'node:path';
-import { FederatedEngine } from '../src/federated-engine.js';
-import { MemoryEngine } from '../src/engine.js';
+import { FederatedEngine } from '../dist/src/federated-engine.js';
+import { MemoryEngine } from '../dist/src/engine.js';
 import {
+  captureEnv,
+  classBaselinePath,
   compareToBaseline,
+  deriveRunnerClass,
+  hardwareMismatch,
   measureLatency,
   measureThroughput,
   renderDeltaTable,
+  renderEnvComparison,
+  renderEnvLine,
+  type PerfEnv,
   type PerfMetric,
   type PerfReport,
 } from '../__test__/benchmark/perf.js';
@@ -37,9 +61,48 @@ const REPORT = arg('report', join(process.cwd(), 'reports', 'perf-report.json'))
 const UPDATE = process.argv.includes('--update-baseline');
 const ROOT = arg('root', join(process.cwd(), '.data', 'perf'));
 const TOLERANCE = Number(arg('tolerance', '0.25'));
+// Absolute noise floor (ms) for latency fields: a latency metric fails only
+// when it breaches BOTH the relative band AND this absolute movement, so
+// sub-millisecond timer jitter (e.g. 0.3→0.4ms p99 = +26%) can't trip the gate.
+const LATENCY_FLOOR_MS = Number(arg('latency-floor', process.env.PERF_LATENCY_FLOOR ?? '0.5'));
+
+/**
+ * Short, stable hardware-class key for baseline selection. Precedence:
+ * explicit `--runner-class` / `PERF_RUNNER_CLASS`, else derived as
+ * `<platform>-<arch>-<cores>c`. Core count is part of the key because
+ * parallel ingest and worker-pool churn scale with it — two boxes with
+ * the same CPU but different core counts are not interchangeable
+ * baselines. The full cpuModel stays in the report's env block for the
+ * failure diff; it is intentionally kept out of the key (cloud SKU model
+ * strings are noisy).
+ */
+function runnerClass(env: PerfEnv): string {
+  const explicit = arg('runner-class', process.env.PERF_RUNNER_CLASS ?? '');
+  return explicit || deriveRunnerClass(env);
+}
 
 async function main(): Promise<void> {
-  console.log(`\n=== perf-gate — seeded suite vs baselines (±${TOLERANCE * 100}%) ===\n`);
+  const env = captureEnv();
+  const cls = runnerClass(env);
+  const classPath = classBaselinePath(BASELINE_PATH, cls);
+
+  if (process.argv.includes('--print-runner-class')) {
+    console.log(cls);
+    return;
+  }
+
+  // Read against the class-specific baseline when one exists, else the
+  // committed default. Always WRITE (on --update-baseline / first
+  // establish) to the class path so re-baselining a runner never clobbers
+  // the committed default.
+  const readBaselinePath = existsSync(classPath) ? classPath : BASELINE_PATH;
+
+  console.log(`\n=== perf-gate — seeded suite vs baselines (±${TOLERANCE * 100}%, ${LATENCY_FLOOR_MS}ms latency noise floor) ===`);
+  console.log(`perf-gate: env ${renderEnvLine(env)}`);
+  console.log(
+    `perf-gate: runner-class=${cls} baseline=${readBaselinePath}` +
+      `${readBaselinePath === classPath ? '' : ' (default fallback — run `make perf-rebaseline` on this runner to pin its class)'}\n`,
+  );
   rmSync(ROOT, { recursive: true, force: true });
   mkdirSync(ROOT, { recursive: true });
 
@@ -151,29 +214,67 @@ async function main(): Promise<void> {
 
   const report: PerfReport = {
     generatedAt: new Date().toISOString(),
-    cores: availableParallelism(),
+    cores: env.cores,
+    env,
     metrics,
   };
   mkdirSync(dirname(REPORT), { recursive: true });
   writeFileSync(REPORT, JSON.stringify(report, null, 2));
 
-  if (UPDATE || !existsSync(BASELINE_PATH)) {
-    mkdirSync(dirname(BASELINE_PATH), { recursive: true });
-    writeFileSync(BASELINE_PATH, JSON.stringify(report, null, 2));
-    console.log(`\nbaseline ${UPDATE ? 'updated' : 'created'}: ${BASELINE_PATH}`);
+  if (UPDATE || !existsSync(readBaselinePath)) {
+    // Establish/refresh the CLASS baseline for this runner — never the
+    // committed default, so pinning a cloud runner is non-destructive.
+    mkdirSync(dirname(classPath), { recursive: true });
+    writeFileSync(classPath, JSON.stringify(report, null, 2));
+    console.log(`\nbaseline ${UPDATE ? 'updated' : 'created'} for runner-class ${cls}: ${classPath}`);
     console.log(`PASS: perf baseline established (no comparison run).\n`);
     return;
   }
 
-  const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')) as PerfReport;
-  const cmp = compareToBaseline(metrics, baseline.metrics, TOLERANCE);
+  const baseline = JSON.parse(readFileSync(readBaselinePath, 'utf8')) as PerfReport;
+  console.log(
+    `perf-gate: baseline generatedAt=${baseline.generatedAt} ` +
+      `${baseline.env ? renderEnvLine(baseline.env) : `cores=${baseline.cores} (pre-env baseline — hardware unknown)`}`,
+  );
+  const cmp = compareToBaseline(metrics, baseline.metrics, TOLERANCE, LATENCY_FLOOR_MS);
   console.log(`\n${renderDeltaTable(cmp)}\n`);
+
+  // On any failure, surface the baseline-vs-current environment so the log
+  // alone shows whether this is a code regression or a different runner —
+  // the perf bands assume identical hardware, and this gate is meant to run
+  // unchanged across local + cloud CI.
+  if (cmp.missing.length > 0 || cmp.failures.length > 0) {
+    console.error(`\n${renderEnvComparison(baseline.env, env)}`);
+    if (hardwareMismatch(baseline.env, env)) {
+      const detail = baseline.env
+        ? `baseline ran on ${baseline.env.cores}×"${baseline.env.cpuModel}", this run on ${env.cores}×"${env.cpuModel}"`
+        : `the baseline predates env capture, so its hardware is unknown`;
+      const pinned = readBaselinePath === classPath;
+      console.error(
+        `\nNOTE: hardware mismatch detected (${detail}).\n` +
+          `      The ±${TOLERANCE * 100}% bands assume identical hardware, so a failure here may be a\n` +
+          `      cloud-runner / CPU difference rather than a code regression — worker-pool cold-open\n` +
+          `      (pool.lruChurnOpen) and parallel ingest are the most hardware-sensitive metrics.\n` +
+          (pinned
+            ? `      This runner-class (${cls}) IS pinned (${classPath}); a mismatch here means the\n` +
+              `      baseline file was captured on different hardware than it claims — re-pin with\n` +
+              `      \`make perf-rebaseline\` on this runner.`
+            : `      Runner-class ${cls} is NOT pinned — comparing against the default fallback.\n` +
+              `      Pin it by running \`make perf-rebaseline\` ON this runner (writes ${classPath}),\n` +
+              `      then commit or CI-cache that file.`),
+      );
+    }
+  }
+
   if (cmp.missing.length > 0) {
     console.error(`FAIL: metrics missing from this run: ${cmp.missing.join(', ')}`);
     process.exit(1);
   }
   if (cmp.failures.length > 0) {
-    console.error(`FAIL: ${cmp.failures.length} metric(s) outside the ±${TOLERANCE * 100}% band.`);
+    console.error(
+      `FAIL: ${cmp.failures.length} metric(s) outside the ±${TOLERANCE * 100}% band: ` +
+        `${cmp.failures.map((f) => `${f.metric}.${f.field}`).join(', ')}`,
+    );
     process.exit(1);
   }
   console.log(`PASS: all ${cmp.deltas.length} perf checks within ±${TOLERANCE * 100}% of baseline.\n`);

@@ -13,6 +13,6 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src/**/*", "__test__/**/*", "integration/**/*"],
-  "exclude": ["integration/repo"]
+  "include": ["src/**/*", "__test__/**/*"],
+  "exclude": ["node_modules", "dist", "integration"]
 }

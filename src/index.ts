@@ -169,5 +169,11 @@ export {
   measureThroughput,
   compareToBaseline,
   renderDeltaTable,
+  captureEnv,
+  hardwareMismatch,
+  renderEnvLine,
+  renderEnvComparison,
+  deriveRunnerClass,
+  classBaselinePath,
 } from '../__test__/benchmark/perf.js';
-export type { PerfMetric, PerfReport, BaselineComparison } from '../__test__/benchmark/perf.js';
+export type { PerfMetric, PerfReport, PerfEnv, BaselineComparison } from '../__test__/benchmark/perf.js';

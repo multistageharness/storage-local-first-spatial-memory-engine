@@ -14,9 +14,9 @@
 import { mkdirSync, rmSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MemoryEngine } from '../src/engine.js';
+import { MemoryEngine } from '../dist/src/engine.js';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DB_A = join(ROOT, '.data', 'integration-replica-a.db');
 const DB_B = join(ROOT, '.data', 'integration-replica-b.db');
 

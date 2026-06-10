@@ -18,9 +18,9 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FederatedEngine } from '../src/federated-engine.js';
-import { chunkText } from '../src/spatial/chunker.js';
-import type { SourceDocumentInput } from '../src/engine.js';
+import { FederatedEngine } from '../dist/src/federated-engine.js';
+import { chunkText } from '../dist/src/spatial/chunker.js';
+import type { SourceDocumentInput } from '../dist/src/engine.js';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -95,9 +95,15 @@ function check(name: string, ok: boolean, detail = ''): void {
 
 function runWorker(writer: string): Promise<{ code: number; output: string }> {
   return new Promise((resolve) => {
+    // This script runs as TypeScript source under tsx, so the worker child must
+    // re-enter through the tsx loader (`node --import tsx self.ts …`); plain
+    // `node self.ts` can't execute TypeScript. The .js branch keeps it working
+    // if it is ever run from a compiled build instead.
+    const self = fileURLToPath(import.meta.url);
+    const loaderArgs = self.endsWith('.ts') ? ['--import', 'tsx'] : [];
     const child = spawn(
       process.execPath,
-      [fileURLToPath(import.meta.url), '--role', 'worker', '--writer', writer, '--root', ROOT, '--docs', String(DOCS_PER_TARGET)],
+      [...loaderArgs, self, '--role', 'worker', '--writer', writer, '--root', ROOT, '--docs', String(DOCS_PER_TARGET)],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     );
     let output = '';

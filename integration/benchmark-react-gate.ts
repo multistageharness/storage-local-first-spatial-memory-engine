@@ -24,7 +24,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { MemoryEngine } from '../src/engine.js';
+import { MemoryEngine } from '../dist/src/engine.js';
 import { BenchmarkRunner } from '../__test__/eval/benchmark.js';
 import { benchmarkRetriever } from '../__test__/eval/retriever.js';
 import { buildRepoBenchmark, loadRepoCorpus } from '../__test__/benchmark/repo-loader.js';

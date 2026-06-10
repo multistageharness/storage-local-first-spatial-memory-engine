@@ -9,7 +9,7 @@
  */
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { FederatedEngine } from '../src/federated-engine.js';
+import { FederatedEngine } from '../dist/src/federated-engine.js';
 import { buildSyntheticOrg } from '../__test__/benchmark/org-dataset.js';
 import {
   FederatedEvalHarness,

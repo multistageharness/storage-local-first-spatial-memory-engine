@@ -1,0 +1,79 @@
+{
+  "generatedAt": "2026-06-10T15:37:33.569Z",
+  "cores": 10,
+  "env": {
+    "host": "macbookpro.lan",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpuModel": "Apple M1 Max",
+    "cores": 10,
+    "memGB": 68.7,
+    "nodeVersion": "v22.17.0",
+    "ci": false
+  },
+  "metrics": {
+    "ingest.singleShard": {
+      "kind": "throughput",
+      "unit": "atoms/s",
+      "value": 551.8069888962432
+    },
+    "ingest.oneDocDelta": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 1.5271250000000123,
+      "p95": 2.037583999999981,
+      "p99": 6.378708000000017,
+      "samples": 20
+    },
+    "ingest.parallel8": {
+      "kind": "throughput",
+      "unit": "atoms/s",
+      "value": 2375.0618476102427
+    },
+    "query.trigram.1way": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 0.06795899999997346,
+      "p95": 0.2229170000000522,
+      "p99": 0.3028340000000753,
+      "samples": 100
+    },
+    "query.hybrid.1way": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 0.1169579999996131,
+      "p95": 0.29579200000080164,
+      "p99": 0.43412499999976717,
+      "samples": 100
+    },
+    "query.federated.1way": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 0.8020830000004935,
+      "p95": 1.1951669999998558,
+      "p99": 1.5601669999996375,
+      "samples": 100
+    },
+    "query.federated.50way": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 2.0280839999995806,
+      "p95": 199.3594579999999,
+      "p99": 200.78966599999967,
+      "samples": 300
+    },
+    "sync.outboxDrain": {
+      "kind": "throughput",
+      "unit": "merges/s",
+      "value": 2612.7822639211413
+    },
+    "pool.lruChurnOpen": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 133.93837499999972,
+      "p95": 138.45266699999956,
+      "p99": 140.81645899999967,
+      "samples": 40
+    }
+  }
+}

@@ -12,14 +12,14 @@
  */
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { FederatedEngine } from '../src/federated-engine.js';
-import { ConfluenceConnector } from '../src/connectors/confluence.js';
-import { runCrawl, runOrgCrawl } from '../src/connectors/runner.js';
+import { FederatedEngine } from '../dist/src/federated-engine.js';
+import { ConfluenceConnector } from '../dist/src/connectors/confluence.js';
+import { runCrawl, runOrgCrawl } from '../dist/src/connectors/runner.js';
 import {
   FixtureConfluenceServer,
   buildFixtureSite,
 } from '../__test__/fixtures/confluence-fixture-server.js';
-import type { ShardDescriptor } from '../src/connectors/types.js';
+import type { ShardDescriptor } from '../dist/src/connectors/types.js';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);

@@ -2,3 +2,9 @@
 # integration/codebase-fs.ts (mui/material-ui sparse checkout) — cached,
 # reused across runs, never committed
 integration/repo/
+
+# local CLI config (real values) — only .env.example is committed
+.env
+
+# materialized SQLite shards written by the engine / repo.cli.ts
+.data/

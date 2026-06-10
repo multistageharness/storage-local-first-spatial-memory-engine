@@ -26,12 +26,12 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FederatedEngine } from '../src/federated-engine.js';
-import { FilesystemConnector } from '../src/connectors/filesystem.js';
-import { runCrawl } from '../src/connectors/runner.js';
-import type { ShardDescriptor } from '../src/connectors/types.js';
+import { FederatedEngine } from '../dist/src/federated-engine.js';
+import { FilesystemConnector } from '../dist/src/connectors/filesystem.js';
+import { runCrawl } from '../dist/src/connectors/runner.js';
+import type { ShardDescriptor } from '../dist/src/connectors/types.js';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..'); // dist/integration → repo root
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..'); // integration/ → project root (run as source via tsx)
 const REPO_URL = 'https://github.com/mui/material-ui.git';
 const REPO_DIR = join(ROOT, 'integration', 'repo'); // shared with integration/repo.ts
 const CLONE_DIR = join(REPO_DIR, 'material-ui');

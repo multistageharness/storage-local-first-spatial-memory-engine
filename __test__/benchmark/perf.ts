@@ -8,6 +8,7 @@
  * is not a regression). This makes DEMO001 §1 "measured results, to
  * beat or match" executable and CI-gated.
  */
+import { availableParallelism, arch as osArch, cpus, hostname, platform as osPlatform, totalmem } from 'node:os';
 
 export interface LatencyMetric {
   kind: 'latency';
@@ -26,10 +27,111 @@ export interface ThroughputMetric {
 
 export type PerfMetric = LatencyMetric | ThroughputMetric;
 
+/**
+ * Hardware/runtime fingerprint of the host that produced a report. The
+ * ±tolerance bands are only meaningful when baseline and current share
+ * the same fingerprint, so a failing gate can prove — rather than leave
+ * the reader to guess — whether a regression is in the code or just a
+ * different runner. `env` is optional: baselines captured before env
+ * capture was added carry only the legacy top-level `cores`.
+ */
+export interface PerfEnv {
+  host: string;
+  platform: string;
+  arch: string;
+  cpuModel: string;
+  cores: number;
+  memGB: number;
+  nodeVersion: string;
+  ci: boolean;
+}
+
 export interface PerfReport {
   generatedAt: string;
+  /** legacy: superseded by env.cores; kept so pre-env baselines still parse */
   cores: number;
+  env?: PerfEnv;
   metrics: Record<string, PerfMetric>;
+}
+
+/** Fingerprint the current host for the report's `env` block. */
+export function captureEnv(): PerfEnv {
+  const cpu = cpus();
+  return {
+    host: hostname(),
+    platform: osPlatform(),
+    arch: osArch(),
+    cpuModel: cpu[0]?.model ?? 'unknown',
+    cores: availableParallelism(),
+    memGB: Math.round((totalmem() / 1e9) * 10) / 10,
+    nodeVersion: process.version,
+    ci: Boolean(
+      process.env.CI ||
+        process.env.GITHUB_ACTIONS ||
+        process.env.GITLAB_CI ||
+        process.env.BUILDKITE ||
+        process.env.CIRCLECI,
+    ),
+  };
+}
+
+/**
+ * True when the bands cannot be trusted because baseline and current ran
+ * on different hardware (or the baseline predates env capture, so its
+ * hardware is unknown). CPU model and core count are the two dimensions
+ * that move the seeded perf suite the most — worker-pool cold-open and
+ * parallel ingest are bound by them.
+ */
+export function hardwareMismatch(baseline: PerfEnv | undefined, current: PerfEnv): boolean {
+  if (!baseline) return true;
+  return baseline.cpuModel !== current.cpuModel || baseline.cores !== current.cores;
+}
+
+/**
+ * Derived hardware-class key for per-runner baseline selection
+ * (.plans/perf-gates/01). `<platform>-<arch>-<cores>c`, e.g.
+ * `linux-x64-4c`. Core count is part of the key because parallel ingest
+ * and worker-pool churn scale with it; cpuModel is deliberately excluded
+ * (cloud SKU model strings are noisy). An explicit override is the
+ * caller's concern — this is the pure default derivation.
+ */
+export function deriveRunnerClass(env: PerfEnv): string {
+  return `${env.platform}-${env.arch}-${env.cores}c`;
+}
+
+/** Class-specific baseline path: perf-baseline.json -> perf-baseline.<class>.json */
+export function classBaselinePath(base: string, cls: string): string {
+  return base.replace(/\.json$/, `.${cls}.json`);
+}
+
+/** One-line env summary for the run header. */
+export function renderEnvLine(env: PerfEnv): string {
+  return `host=${env.host} ${env.platform}/${env.arch} cores=${env.cores} cpu="${env.cpuModel}" mem=${env.memGB}GB node=${env.nodeVersion} ci=${env.ci}`;
+}
+
+/**
+ * Side-by-side baseline-vs-current env table, marking each row that
+ * differs with `≠`. Printed on failure so the cause (code vs runner) is
+ * visible in the log without re-running anything.
+ */
+export function renderEnvComparison(baseline: PerfEnv | undefined, current: PerfEnv): string {
+  const row = (label: string, b: unknown, c: unknown): string => {
+    const bs = b === undefined ? 'n/a' : String(b);
+    const cs = String(c);
+    const flag = bs === cs ? ' ' : '≠';
+    return `  ${flag} ${label.padEnd(9)} baseline=${bs.padStart(24)}   current=${cs.padStart(24)}`;
+  };
+  const b = baseline;
+  return [
+    'environment (baseline vs this run):',
+    row('host', b?.host, current.host),
+    row('cpu', b?.cpuModel, current.cpuModel),
+    row('cores', b?.cores, current.cores),
+    row('mem(GB)', b?.memGB, current.memGB),
+    row('platform', b ? `${b.platform}/${b.arch}` : undefined, `${current.platform}/${current.arch}`),
+    row('node', b?.nodeVersion, current.nodeVersion),
+    row('ci', b?.ci, current.ci),
+  ].join('\n');
 }
 
 export function percentile(sorted: number[], p: number): number {
@@ -98,6 +200,13 @@ export interface BaselineDelta {
   /** +12.3 means 12.3% worse-direction movement */
   deltaPct: number;
   withinBand: boolean;
+  /**
+   * True when the relative band WAS exceeded but the absolute worse-direction
+   * movement stayed within the latency noise floor, so the metric passes on
+   * floor grounds. Lets the delta table explain why a big-looking percentage
+   * (e.g. +26% on a 0.3ms→0.4ms p99) did not fail the gate.
+   */
+  noiseFloored?: boolean;
 }
 
 export interface BaselineComparison {
@@ -112,11 +221,21 @@ export interface BaselineComparison {
 /**
  * One-sided tolerance comparison. Latency fields (p50/p95/p99) regress
  * upward; throughput regresses downward. `tolerance` 0.25 = ±25% band.
+ *
+ * `latencyFloorMs` is an absolute noise floor for latency fields: at
+ * sub-millisecond magnitudes the percentage band is dominated by timer
+ * and scheduling jitter (a 0.3ms→0.4ms p99 reads +26% but is ~0.1ms of
+ * noise), so a latency field counts as out-of-band only when it exceeds
+ * BOTH the relative tolerance AND this absolute movement. The floor scales
+ * nothing: on a multi-millisecond metric it is negligible, so real
+ * regressions there are still caught by the relative band. Throughput is
+ * unaffected (its values are far from any timer floor).
  */
 export function compareToBaseline(
   current: Record<string, PerfMetric>,
   baseline: Record<string, PerfMetric>,
   tolerance = 0.25,
+  latencyFloorMs = 0.5,
 ): BaselineComparison {
   const deltas: BaselineDelta[] = [];
   const missing: string[] = [];
@@ -134,7 +253,17 @@ export function compareToBaseline(
         const c = cur[field];
         if (b <= 0) continue;
         const deltaPct = ((c - b) / b) * 100; // positive = slower = worse
-        deltas.push({ metric: name, field, baseline: b, current: c, deltaPct, withinBand: c <= b * (1 + tolerance) });
+        const withinRel = c <= b * (1 + tolerance);
+        const withinFloor = c - b <= latencyFloorMs; // absolute worse-direction movement
+        deltas.push({
+          metric: name,
+          field,
+          baseline: b,
+          current: c,
+          deltaPct,
+          withinBand: withinRel || withinFloor,
+          noiseFloored: !withinRel && withinFloor,
+        });
       }
     } else if (base.kind === 'throughput' && cur.kind === 'throughput') {
       const deltaPct = ((base.value - cur.value) / base.value) * 100; // positive = lower = worse
@@ -155,9 +284,19 @@ export function renderDeltaTable(cmp: BaselineComparison): string {
   const rows = cmp.deltas.map((d) => {
     const flag = d.withinBand ? ' ' : '✗';
     const sign = d.deltaPct >= 0 ? '+' : '';
+    // deltaPct is signed in the worse direction: positive = regressed.
+    // Only annotate the rows that matter so the log isn't a wall of
+    // "(worse-direction)" on metrics that actually held or improved.
+    const note = !d.withinBand
+      ? '  <-- OUT OF BAND (worse-direction)'
+      : d.noiseFloored
+        ? `  (within noise floor; +${d.deltaPct.toFixed(1)}% but ${(d.current - d.baseline).toFixed(2)}ms abs)`
+        : d.deltaPct < 0
+          ? '  (better)'
+          : '';
     return `${flag} ${d.metric}.${d.field.padEnd(5)} base=${d.baseline.toFixed(1).padStart(10)}  cur=${d.current
       .toFixed(1)
-      .padStart(10)}  Δ ${sign}${d.deltaPct.toFixed(1)}% (worse-direction)`;
+      .padStart(10)}  Δ ${sign}${d.deltaPct.toFixed(1)}%${note}`;
   });
   return rows.join('\n');
 }

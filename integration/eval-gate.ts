@@ -20,7 +20,7 @@
  */
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { MemoryEngine } from '../src/engine.js';
+import { MemoryEngine } from '../dist/src/engine.js';
 import { synthesizeGoldens, type CorpusDoc } from '../__test__/eval/goldens.js';
 import { RagEvalHarness, DEFAULT_THRESHOLDS } from '../__test__/eval/harness.js';
 import { engineRetriever } from '../__test__/eval/retriever.js';

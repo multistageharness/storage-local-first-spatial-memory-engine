@@ -12,9 +12,9 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { FederatedEngine } from '../src/federated-engine.js';
-import { GitOrgConnector } from '../src/connectors/git-org.js';
-import { runOrgCrawl } from '../src/connectors/runner.js';
+import { FederatedEngine } from '../dist/src/federated-engine.js';
+import { GitOrgConnector } from '../dist/src/connectors/git-org.js';
+import { runOrgCrawl } from '../dist/src/connectors/runner.js';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);

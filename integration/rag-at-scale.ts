@@ -18,7 +18,7 @@
  */
 import { mkdirSync, rmSync, existsSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { MemoryEngine } from '../src/engine.js';
+import { MemoryEngine } from '../dist/src/engine.js';
 
 // ---- CLI ----------------------------------------------------------------
 

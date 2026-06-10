@@ -13,7 +13,7 @@
  */
 import { mkdirSync, rmSync, statSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { FederatedEngine } from '../src/federated-engine.js';
+import { FederatedEngine } from '../dist/src/federated-engine.js';
 import { buildSyntheticOrg, mulberry32, synthesizeOrgQueries } from '../__test__/benchmark/org-dataset.js';
 
 function arg(name: string, fallback: string): string {

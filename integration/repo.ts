@@ -15,15 +15,47 @@ import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MemoryEngine } from '../src/engine.js';
+import { MemoryEngine } from '../dist/src/engine.js';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..'); // dist/integration → repo root
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..'); // integration/ → project root (run as source via tsx)
 const REPO_URL = 'https://github.com/mui/material-ui.git';
 const REPO_DIR = join(ROOT, 'integration', 'repo');
 const CLONE_DIR = join(REPO_DIR, 'material-ui');
 const SPARSE_PATH = 'packages/mui-material/src'; // only this subtree is materialized
 const DB_PATH = join(ROOT, '.data', 'integration-repo.db');
 const MAX_FILE_BYTES = 256 * 1024; // skip generated monsters
+
+// Optional include/ignore filters, layered on top of the built-in
+// extension + test/.d.ts + size rules. Both default to EMPTY (no-op), so the
+// out-of-the-box behavior is unchanged; supply either to narrow the ingest:
+//   --filter <re>   keep ONLY files whose clone-relative path matches <re>
+//   --ignore <re>   DROP files whose clone-relative path matches <re>
+// <re> is a JS regular expression tested against the forward-slashed path that
+// also becomes each atom's originFile (e.g.
+// 'material-ui/packages/mui-material/src/Button/Button.tsx'). Env fallbacks:
+// FILTER, IGNORE.  Examples:
+//   --ignore '/(Unstable_|legacy)/'      drop unstable/legacy subtrees
+//   --filter '/Button/'                  ingest only the Button family
+function flag(name: string): string {
+  const eq = process.argv.find((a) => a.startsWith(`--${name}=`));
+  if (eq) return eq.slice(name.length + 3);
+  const i = process.argv.indexOf(`--${name}`);
+  const next = process.argv[i + 1];
+  return i >= 0 && next && !next.startsWith('--') ? next : '';
+}
+function compileFilter(label: string, src: string): RegExp | undefined {
+  if (!src) return undefined;
+  try {
+    return new RegExp(src);
+  } catch (e) {
+    console.error(`repo.ts: invalid --${label} regex ${JSON.stringify(src)}: ${(e as Error).message}`);
+    process.exit(2);
+  }
+}
+const FILTER = flag('filter') || process.env.FILTER || '';
+const IGNORE = flag('ignore') || process.env.IGNORE || '';
+const filterRe = compileFilter('filter', FILTER);
+const ignoreRe = compileFilter('ignore', IGNORE);
 
 function freshDb(path: string): void {
   mkdirSync(dirname(path), { recursive: true });
@@ -59,6 +91,12 @@ function collectSourceFiles(): string[] {
     .filter((e) => !/\.(test|spec)\.|\.d\.ts$/.test(e.name))
     .map((e) => join(e.parentPath, e.name))
     .filter((f) => statSync(f).size <= MAX_FILE_BYTES)
+    .filter((f) => {
+      const rel = relative(CLONE_DIR, f).split('\\').join('/'); // forward-slashed, == originFile
+      if (filterRe && !filterRe.test(rel)) return false; // --filter: keep only matches
+      if (ignoreRe && ignoreRe.test(rel)) return false; //  --ignore: drop matches
+      return true;
+    })
     .sort();
 }
 
@@ -79,7 +117,12 @@ async function main(): Promise<void> {
   });
 
   // -- ingest every source file in the sparse subtree verbatim ---------------
+  if (filterRe || ignoreRe) console.log(`[repo] filters applied → filter=${FILTER || '∅'} ignore=${IGNORE || '∅'}`);
   const files = collectSourceFiles();
+  if (files.length === 0) {
+    console.error(`\nFAIL: no source files to ingest${filterRe || ignoreRe ? ' — filter/ignore excluded everything' : ''}`);
+    process.exit(1);
+  }
   let atoms = 0;
   const clusterTotals: Record<string, number> = {};
   for (const [i, file] of files.entries()) {

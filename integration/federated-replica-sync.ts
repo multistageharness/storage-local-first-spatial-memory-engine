@@ -15,7 +15,7 @@
  */
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { FederatedEngine } from '../src/federated-engine.js';
+import { FederatedEngine } from '../dist/src/federated-engine.js';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);

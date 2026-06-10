@@ -13,9 +13,9 @@
 import { readdirSync, readFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MemoryEngine } from '../src/engine.js';
+import { MemoryEngine } from '../dist/src/engine.js';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..'); // dist/integration → repo root
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..'); // integration/ → project root (run as source via tsx)
 const SRC = join(ROOT, 'src');
 const DB_PATH = join(ROOT, '.data', 'integration-codebase.db');
 

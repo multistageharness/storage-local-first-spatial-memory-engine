@@ -19,7 +19,7 @@
  */
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { MemoryEngine } from '../src/engine.js';
+import { MemoryEngine } from '../dist/src/engine.js';
 import { BenchmarkRunner, type BenchmarkReport } from '../__test__/eval/benchmark.js';
 import { benchmarkRetriever } from '../__test__/eval/retriever.js';
 import { LexicalJudge, JudgeJury } from '../__test__/eval/judge.js';

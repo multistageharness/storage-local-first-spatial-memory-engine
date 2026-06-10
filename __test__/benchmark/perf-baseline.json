@@ -1,0 +1,69 @@
+{
+  "generatedAt": "2026-06-07T20:51:12.027Z",
+  "cores": 10,
+  "metrics": {
+    "ingest.singleShard": {
+      "kind": "throughput",
+      "unit": "atoms/s",
+      "value": 729.9740460009114
+    },
+    "ingest.oneDocDelta": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 1.5011250000000018,
+      "p95": 1.9789169999999672,
+      "p99": 3.060457999999983,
+      "samples": 20
+    },
+    "ingest.parallel8": {
+      "kind": "throughput",
+      "unit": "atoms/s",
+      "value": 2374.0420649210173
+    },
+    "query.trigram.1way": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 0.07358300000032614,
+      "p95": 0.25683399999979883,
+      "p99": 0.4162500000002183,
+      "samples": 100
+    },
+    "query.hybrid.1way": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 0.12229200000001583,
+      "p95": 0.3400000000001455,
+      "p99": 0.4577500000004875,
+      "samples": 100
+    },
+    "query.federated.1way": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 0.7702909999998155,
+      "p95": 1.156207999999424,
+      "p99": 1.54424999999992,
+      "samples": 100
+    },
+    "query.federated.50way": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 1.9961670000002414,
+      "p95": 172.53729199999998,
+      "p99": 184.32158299999992,
+      "samples": 300
+    },
+    "sync.outboxDrain": {
+      "kind": "throughput",
+      "unit": "merges/s",
+      "value": 2618.372584752247
+    },
+    "pool.lruChurnOpen": {
+      "kind": "latency",
+      "unit": "ms",
+      "p50": 139.04891599999974,
+      "p95": 144.23845900000015,
+      "p99": 157.86720799999966,
+      "samples": 40
+    }
+  }
+}

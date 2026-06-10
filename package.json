@@ -1,0 +1,50 @@
+{
+  "name": "spatial-memory-engine-org",
+  "version": "0.2.0",
+  "description": "Org-scale local-first spatial memory engine (demo002): federated demo001 SQLite kernels — shard-per-graph, hybrid FTS5 retrieval (trigram+unicode61+optional vectors), RRF federation, checkpointed Confluence/Git connectors, CRDT epoch GC + partial replication",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node --test \"dist/__test__/*.test.js\"",
+    "eval": "npm run build && node dist/integration/eval-gate.js",
+    "eval:jury": "npm run build && node dist/integration/eval-gate.js --jury",
+    "benchmark": "npm run build && node dist/integration/benchmark-gate.js",
+    "benchmark:jury": "npm run build && node dist/integration/benchmark-gate.js --jury",
+    "benchmark:react": "npm run build && node dist/integration/benchmark-react-gate.js",
+    "rag-at-scale": "npm run build && node dist/integration/rag-at-scale.js",
+    "rag-at-scale:big": "npm run build && node dist/integration/rag-at-scale.js --docs 5000 --queries 200",
+    "integration": "npm run build && node dist/integration/codebase-rag.js && node dist/integration/multi-writer-concurrency.js && node dist/integration/crdt-replica-sync.js",
+    "integration:codebase-rag": "npm run build && node dist/integration/codebase-rag.js",
+    "integration:multi-writer": "npm run build && node dist/integration/multi-writer-concurrency.js",
+    "integration:replica-sync": "npm run build && node dist/integration/crdt-replica-sync.js",
+    "integration:repo": "npm run build && node dist/integration/repo.js",
+    "integration:codebase-fs": "npm run build && node dist/integration/codebase-fs.js",
+    "eval:federated": "npm run build && node dist/integration/eval-gate-federated.js",
+    "benchmark:org": "npm run build && node dist/integration/benchmark-org-gate.js",
+    "perf": "npm run build && node dist/integration/perf-gate.js",
+    "org-ingest": "npm run build && node dist/integration/org-ingest.js",
+    "org-incremental": "npm run build && node dist/integration/org-incremental.js",
+    "rag-at-org-scale": "npm run build && node dist/integration/rag-at-org-scale.js",
+    "rag-at-org-scale:big": "npm run build && node dist/integration/rag-at-org-scale.js --shards 500 --queries 1000 --recall-only",
+    "integration:multi-writer-org": "npm run build && node dist/integration/multi-writer-org.js",
+    "integration:federated-replica-sync": "npm run build && node dist/integration/federated-replica-sync.js",
+    "integration:confluence": "npm run build && node dist/integration/confluence-gate.js",
+    "integration:repo-org": "npm run build && node dist/integration/repo-org-gate.js",
+    "soak:smoke": "npm run build && node dist/integration/soak.js --minutes 1 --shards 16"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "yjs": "^13.6.31"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.9.2",
+    "typescript": "^6.0.3"
+  }
+}
